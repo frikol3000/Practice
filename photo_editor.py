@@ -409,11 +409,10 @@ class MainLayout(QVBoxLayout):
         self.img_size_lbl = QLabel()
         self.img_size_lbl.setAlignment(Qt.AlignCenter)
 
-        self.save_btn = QPushButton("Сохранить")
-        self.save_btn.setMinimumWidth(BTN_MIN_WIDTH)
-        self.save_btn.clicked.connect(self.on_save)
-        self.save_btn.setEnabled(False)
-        self.save_btn.setStyleSheet("font-weight:bold;")
+        upload_btn = QPushButton("Загрузить")
+        upload_btn.setMinimumWidth(BTN_MIN_WIDTH)
+        upload_btn.clicked.connect(self.on_upload)
+        upload_btn.setStyleSheet("font-weight:bold;")
 
         self.reset_btn = QPushButton("Отмена")
         self.reset_btn.setMinimumWidth(BTN_MIN_WIDTH)
@@ -421,6 +420,11 @@ class MainLayout(QVBoxLayout):
         self.reset_btn.setEnabled(False)
         self.reset_btn.setStyleSheet("font-weight:bold;")
 
+        self.save_btn = QPushButton("Сохранить")
+        self.save_btn.setMinimumWidth(BTN_MIN_WIDTH)
+        self.save_btn.clicked.connect(self.on_save)
+        self.save_btn.setEnabled(False)
+        self.save_btn.setStyleSheet("font-weight:bold;")
 
         self.addWidget(self.img_lbl)
         self.addWidget(self.img_size_lbl)
@@ -432,12 +436,11 @@ class MainLayout(QVBoxLayout):
 
         btn_layout = QHBoxLayout()
         btn_layout.setAlignment(Qt.AlignCenter)
-        btn_layout.addWidget(self.save_btn)
+        btn_layout.addWidget(upload_btn)
         btn_layout.addWidget(self.reset_btn)
+        btn_layout.addWidget(self.save_btn)
 
         self.addLayout(btn_layout)
-
-        self.on_upload()
 
     def place_preview_img(self):
         img = _get_img_with_all_operations()
@@ -446,7 +449,7 @@ class MainLayout(QVBoxLayout):
         self.img_lbl.setPixmap(preview_pix)
 
     def on_save(self):
-        new_img_path, _ = QFileDialog.getSaveFileName(self, "QFileDialog.getSaveFileName()",
+        new_img_path, _ = QFileDialog.getSaveFileName(self.parent, "QFileDialog.getSaveFileName()",
                                                       f"ez_pz_{self.file_name}",
                                                       "Images (*.png *.jpg)")
 
@@ -462,6 +465,7 @@ class MainLayout(QVBoxLayout):
             self.file_name = ntpath.basename(img_path)
 
             pix = QPixmap(img_path)
+            print(pix[4, 4])
             self.img_lbl.setPixmap(pix)
             self.img_lbl.setScaledContents(True)
             self.action_tabs.setVisible(True)
@@ -537,19 +541,19 @@ class PhotoEditWindow(QWidget):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    # def closeEvent(self, event):
-    #     if operations.has_changes():
-    #         msgBox = QMessageBox()
-    #         msgBox.setIcon(QMessageBox.Warning)
-    #         msgBox.setText("Вы действительно хотите выйти?")
-    #         msgBox.setWindowTitle("Сообщение о выходе")
-    #         msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-    #
-    #         Reply = msgBox.exec()
-    #         if Reply == QMessageBox.Yes:
-    #             event.accept()
-    #         else:
-    #             event.ignore()
+    def closeEvent(self, event):
+        if operations.has_changes():
+            msgBox = QMessageBox()
+            msgBox.setIcon(QMessageBox.Warning)
+            msgBox.setText("Вы действительно хотите выйти?")
+            msgBox.setWindowTitle("Сообщение о выходе")
+            msgBox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+            Reply = msgBox.exec()
+            if Reply == QMessageBox.Yes:
+                event.accept()
+            else:
+                event.ignore()
 
     def resizeEvent(self, e):
         pass
@@ -560,4 +564,13 @@ class QVLine(QFrame):
         super(QVLine, self).__init__()
         self.setFrameShape(QFrame.VLine)
         self.setFrameShadow(QFrame.Sunken)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    win = PhotoEditWindow()
+    translator = QTranslator(app)
+    translator.load('{}qtbase_{}.qm'.format(I18N_QT_PATH, "ru_RU"))
+    app.installTranslator(translator)
+    sys.exit(app.exec_())
 

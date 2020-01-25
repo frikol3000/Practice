@@ -4,8 +4,11 @@ from PIL import Image, ImageTk
 from tkinter import filedialog
 from Photoeditor import PhotoEditor
 import os
+import cv2
+import numpy as np
 
 filename = "No-img.png"
+
 
 def openPhotoEditor():
     PhotoEditor(filename, root)
@@ -25,8 +28,7 @@ def setPath():
 
     if filename == "":
         filename = "No-img.png"
-    else:
-        filename = os.path.split(filename)[1]
+
 
     load = Image.open(filename)
     load = load.resize((650, 500))
