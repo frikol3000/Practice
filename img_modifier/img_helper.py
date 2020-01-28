@@ -43,18 +43,3 @@ def flip_left(img):
 
 def flip_top(img):
     return img.transpose(Image.FLIP_TOP_BOTTOM)
-
-
-def save(img, path):
-    """Save image to hard drive"""
-
-    img.save(path)
-
-
-def open_img(img):
-    """
-    Open image in temporary file
-    !use it only for debug!
-    """
-
-    img.open()

@@ -40,13 +40,13 @@ class Operations():
         self.upside_down = False
 
 class PhotoEditor(tk.Toplevel):
-    def __init__(self, filename, master=None):
+    def __init__(self, img_widget, filename, master=None):
         tk.Toplevel.__init__(self, master)
+        self.img_widget = img_widget
         self.filename = filename
         self.master = master
         self.title('Редактор фото')
-        self.resizable(True, False)
-        self.geometry('500x700')
+        self.resizable(False, False)
         self._frame = None
         self.operations = Operations()
 
@@ -58,8 +58,10 @@ class PhotoEditor(tk.Toplevel):
         buttonsFrame = tk.Frame(self, height=40, width=40, bg='gray')
         buttonsFrame.pack(side=tk.TOP, fill='x')
 
+        self.original_img = Image.open(filename).convert("RGB")
         self.load = Image.open(filename).convert("RGB")
-        self.render = ImageTk.PhotoImage(self.load)
+        self.temp = self.getImg_With_All_Operations()
+        self.render = ImageTk.PhotoImage(self.temp)
         self.image = tk.Label(photoFrame, image=self.render)
         self.image.pack(expand=True, fill='both')
 
@@ -72,13 +74,23 @@ class PhotoEditor(tk.Toplevel):
         self.notebook.add(self.rotationTab, text="Поворот")
         self.notebook.pack(expand=False, fill='both')
 
-        saveButton = tk.Button(buttonsFrame, text="Сохранить", bd=3)
-        resetButton = tk.Button(buttonsFrame, text="Отменить", bd=3, command=self.reset)
+        saveButton = tk.Button(buttonsFrame, text="Сохранить", bd=3, command=self.save)
+        resetButton = tk.Button(buttonsFrame, text="Сброс", bd=3, command=self.reset)
         resetButton.pack(side=tk.RIGHT, padx=5, pady=5)
         saveButton.pack(side=tk.RIGHT, padx=5, pady=5)
 
+    def save(self):
+        self.getImg_With_All_Operations(resize=False).save("./temp.png")
+        load = self.getImg_With_All_Operations(resize=False)
+        render = ImageTk.PhotoImage(image=load)
+        self.img_widget.configure(image=render)
+        self.img_widget.image = render
+        pass
+
     def reset(self):
         self.operations.reset()
+        self.adjustingTab.reset_sliders()
+        self.load = self.original_img.copy()
         self.setNewImage()
 
     def switch_frame(self, frame_class):
@@ -88,24 +100,22 @@ class PhotoEditor(tk.Toplevel):
         self._frame = new_frame
         self._frame.pack()
 
-    def switch_tab1(self, frame_class):
-        new_frame = frame_class(self.notebook)
-        self.tab1.destroy()
-        self.tab1 = new_frame
+    def setFilter(self):
+        self.load = self.original_img.copy()
+        filt.setFilter(self.operations.filter, self.load)
+        self.setNewImage()
 
-    def setNewImage(self):
+    def getImg_With_All_Operations(self, resize=True):
         b = self.operations.brightness
         c = self.operations.contrast
         s = self.operations.sharpness
 
         self.img = self.load.copy()
-        filt.setFilter(self.operations.filter, self.img)
         self.img = img_transformation.rotate(self.img, self.operations.angle)
         if self.operations.left_right:
             self.img = img_transformation.flip_left(self.img)
         if self.operations.upside_down:
             self.img = img_transformation.flip_top(self.img)
-
 
         if b != 0:
             self.img = img_transformation.brightness(self.img, b)
@@ -116,10 +126,16 @@ class PhotoEditor(tk.Toplevel):
         if s != 0:
             self.img = img_transformation.sharpness(self.img, s)
 
-        h = THUMB_SIZE
-        w = _get_ratio_width(self.img.width, self.img.height, h)
-        self.img = self.img.resize((w, h))
-        self.n_img = ImageTk.PhotoImage(self.img)
+        if resize:
+            h = THUMB_SIZE
+            w = _get_ratio_width(self.img.width, self.img.height, h)
+            self.img = self.img.resize((w, h))
+
+        return self.img
+
+    def setNewImage(self):
+        img = self.getImg_With_All_Operations()
+        self.n_img = ImageTk.PhotoImage(img)
         self.image.configure(image=self.n_img)
 
 class Filters(ttk.Frame):
@@ -129,11 +145,11 @@ class Filters(ttk.Frame):
         self.master = master
         self.filename = filename
         self.img = Image.open(self.filename).convert("RGB")
+        self.img = self.img.resize((200, 110))
         filter_names = {'sepia': None, 'black_white': None, 'negative': None}
         for i in filter_names:
             filter_names[i] = self.img.copy()
             filt.setFilter(i, filter_names[i])
-            filter_names[i] = filter_names[i].resize((160, 90))
         self.sepia = ImageTk.PhotoImage(filter_names['sepia'])
         self.black_white = ImageTk.PhotoImage(filter_names['black_white'])
         self.negative = ImageTk.PhotoImage(filter_names['negative'])
@@ -146,30 +162,38 @@ class Filters(ttk.Frame):
 
     def setSepia(self):
         self.master.master.master.operations.filter = 'sepia'
-        self.master.master.master.setNewImage()
+        self.master.master.master.setFilter()
         pass
 
     def setBlackWhite(self):
         self.master.master.master.operations.filter = 'black_white'
-        self.master.master.master.setNewImage()
+        self.master.master.master.setFilter()
         pass
 
     def setNegative(self):
         self.master.master.master.operations.filter = 'negative'
-        self.master.master.master.setNewImage()
+        self.master.master.master.setFilter()
         pass
 
 class Adjusting(ttk.Frame):
     def __init__(self, master, photo):
         ttk.Frame.__init__(self, master)
         self.photo = photo
-        self.slider_brightness = tk.Scale(self, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL, command=self.on_brightness_slider_released)
+        self.label_brightness = tk.Label(self, text="Яркость")
+        self.label_brightness.place(x=130, y=18)
+        self.slider_brightness = tk.Scale(self, length=400, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL)
+        self.slider_brightness.bind("<ButtonRelease-1>", self.on_brightness_slider_released)
         self.slider_brightness.pack(side=tk.TOP)
-        self.slider_sharpness = tk.Scale(self, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL, command=self.on_sharpness_slider_released)
+        self.label_sharpness = tk.Label(self, text="Четкость")
+        self.label_sharpness.place(x=130, y=62)
+        self.slider_sharpness = tk.Scale(self, length=400, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL)
+        self.slider_sharpness.bind("<ButtonRelease-1>", self.on_sharpness_slider_released)
         self.slider_sharpness.pack(side=tk.TOP)
-        self.slider_contrast = tk.Scale(self, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL, command=self.on_contrast_slider_released)
+        self.label_contrast = tk.Label(self, text="Контраст")
+        self.label_contrast.place(x=130, y=104)
+        self.slider_contrast = tk.Scale(self, length=400, from_=SLIDER_MIN_VAL, to=SLIDER_MAX_VAL, orient=tk.HORIZONTAL)
+        self.slider_contrast.bind("<ButtonRelease-1>", self.on_contrast_slider_released)
         self.slider_contrast.pack(side=tk.TOP)
-
 
 
     def on_brightness_slider_released(self, e):
@@ -196,6 +220,11 @@ class Adjusting(ttk.Frame):
 
         self.master.master.master.setNewImage()
 
+    def reset_sliders(self):
+        self.slider_contrast.set(0)
+        self.slider_sharpness.set(0)
+        self.slider_brightness.set(0)
+
 class Rotation(ttk.Frame):
     def __init__(self, master, filename):
         ttk.Frame.__init__(self, master)
@@ -205,14 +234,14 @@ class Rotation(ttk.Frame):
         self.load = Image.open(self.filename).convert("RGB")
         self.load = self.load.resize(
             (self.master.master.master.render.width(), self.master.master.master.render.height()))
-        forward_rotation = tk.Button(self, text="Против часовой стрелки", command=self.rotateForward)
-        forward_rotation.pack(side=tk.LEFT)
-        backward_rotation = tk.Button(self, text="По часовой стрелки", command=self.rotateBackward)
-        backward_rotation.pack(side=tk.LEFT)
-        upside_down = tk.Button(self, text="↑↓", command=self.turnUpsideDown)
-        upside_down.pack(side=tk.LEFT)
-        left_to_right = tk.Button(self, text="⇆", command=self.turnLeft)
-        left_to_right.pack(side=tk.LEFT)
+        forward_rotation = tk.Button(self, text="Против часовой стрелки", font=50, command=self.rotateForward)
+        forward_rotation.pack(side=tk.LEFT, padx=10, pady=10)
+        backward_rotation = tk.Button(self, text="По часовой стрелки", font=50, command=self.rotateBackward)
+        backward_rotation.pack(side=tk.LEFT, padx=10, pady=10)
+        upside_down = tk.Button(self, text="↑↓", width=20, font=50, command=self.turnUpsideDown)
+        upside_down.pack(side=tk.LEFT, padx=10, pady=10)
+        left_to_right = tk.Button(self, text="⇆", width=20, font=50, command=self.turnLeft)
+        left_to_right.pack(side=tk.LEFT, padx=10, pady=10)
 
     def rotateForward(self):
         self.master.master.master.operations.angle += 90

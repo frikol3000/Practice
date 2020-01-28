@@ -1,12 +1,16 @@
 import win32print
 import win32ui
 from PIL import Image, ImageWin
+from os import remove
 
-def printImage(file_name, printer_num=None):
+def printImage(file_name):
   PHYSICALWIDTH = 110
   PHYSICALHEIGHT = 111
 
-  printer_name = win32print.EnumPrinters()[printer_num]
+  try:
+    printer_name = win32print.GetDefaultPrinter()
+  except:
+    print("No printer found")
 
   hDC = win32ui.CreateDC ()
   hDC.CreatePrinterDC (printer_name)
@@ -25,3 +29,5 @@ def printImage(file_name, printer_num=None):
   hDC.EndPage ()
   hDC.EndDoc ()
   hDC.DeleteDC ()
+
+  remove("temp.png")
